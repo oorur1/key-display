@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 import { listen } from '@tauri-apps/api/event';
@@ -11,67 +10,131 @@ interface GamepadEvent {
   axis?: number;
 }
 
-async function setupGamepadListener() {
-  const unlisten = await listen<GamepadEvent>('gamepad-input', event => {
-    if (event.payload.type == "button") {
-      if (event.payload.pressed == true)
-        console.log("You pressed button:", event.payload.button);
-      else
-        console.log("You released button:", event.payload.button);
-    }
-    if (event.payload.type == "scratch") {
-      console.log("You turned scratch:", event.payload.axis);
-    }
-  })
-  return unlisten;
-}
-
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [pressed, setPressed] = useState(Array(7).fill(false));
+  const [rotation, setRotation] = useState(0.0);
+  const [isTopRotating, setIsTopRotating] = useState(false);
+  const [isBottomRotating, setIsBottomRotating] = useState(false);
 
-  useEffect(() => {
-    setupGamepadListener();
-  }, []);
+  async function setupGamepadListener() {
+    const unlisten = await listen<GamepadEvent>('gamepad-input', event => {
+      if (event.payload.type == "button" && event.payload.button !== undefined) {
+        const buttonIndex = event.payload.button;
+        const isPressed = event.payload.pressed;
+        if (isPressed) {
+          setPressed(prevPressed => {
+            const newPressed = [...prevPressed];
+            newPressed[buttonIndex] = true;
+            return newPressed;
+          });
+        }
+        else {
+          setPressed(prevPressed => {
+            const newPressed = [...prevPressed];
+            newPressed[buttonIndex] = false;
+            return newPressed;
+          });
+        }
+      }
+      if (event.payload.type == "scratch" && event.payload.axis !== undefined) {
+        const newRotation = (32768.0 + event.payload.axis) / 65536.0 * 360.0;
+        setRotation(prevRotation => {
+          //TODO: 0->360 もしくは 360 -> 0で逆方向の回転が入る
+          if (prevRotation > newRotation) {
+            setIsBottomRotating(true);
+            setIsTopRotating(false);
+          } else if (prevRotation < newRotation) {
+            setIsTopRotating(true);
+            setIsBottomRotating(false);
+          }
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
+          return newRotation;
+        });
+      }
+    })
+    return unlisten;
   }
 
+  // Gamepad listenerの起動
+  useEffect(() => {
+    let unlistenFn: (() => void) | null = null;
+
+    setupGamepadListener().then(unlisten => {
+      unlistenFn = unlisten;
+    });
+
+    // クリーンアップ関数
+    return () => {
+      if (unlistenFn) {
+        unlistenFn();
+      }
+    }
+  }, []);
+
+  // Scratch
+  useEffect(() => {
+    console.log(isBottomRotating);
+    if (isTopRotating) {
+      const timer = setTimeout(() => {
+        setIsTopRotating(false);
+      }, 50);
+
+      return () => clearTimeout(timer);
+    } else if (isBottomRotating) {
+      const timer = setTimeout(() => {
+        setIsBottomRotating(false);
+      }, 50);
+
+      return () => clearTimeout(timer);
+    }
+  }, [rotation]);
+
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <>
+      <div className="container">
+        <div className="main-layout">
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
+          <div className="scratch-container">
+            <div className={`scratch scratch-top ${isTopRotating ? 'rotating' : ''}`}></div>
+            <div className={`scratch scratch-bottom ${isBottomRotating ? 'rotating' : ''}`}></div>
+          </div>
 
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+          <div className="keys-container">
+            <div className="row">
+              {
+                pressed.map((isPressed, index) => {
+                  const is_blue_key = (index: number) => {
+                    if (index === 1 || index === 3 || index === 5) {
+                      return <div key={index} className={isPressed ? "key-pressed-blue" : "key"}></div>;
+                    } else {
+                      return;
+                    }
+                  }
+
+                  return (is_blue_key(index))
+                })
+              }
+            </div>
+
+            <div className="row">
+              {
+                pressed.map((isPressed, index) => {
+                  const is_blue_key = (index: number) => {
+                    if (index === 0 || index === 2 || index === 4 || index === 6) {
+                      return <div key={index} className={isPressed ? "key-pressed-white" : "key"}></div>;
+                    } else {
+                      return;
+                    }
+                  }
+
+                  return (is_blue_key(index))
+                })
+              }
+            </div>
+          </div>
+        </div>
+      </div >
+    </>
   );
 }
 
