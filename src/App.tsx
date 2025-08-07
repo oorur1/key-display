@@ -10,12 +10,60 @@ interface GamepadEvent {
   axis?: number;
 }
 
+const ScratchComponent = () => {
+  return (
+    <>
+    </>
+  );
+}
+
+const KeysComponent = ({ pressed }: { pressed: Array<boolean> }) => {
+
+  return (
+    <div className="keys-container">
+      <div className="row">
+        {
+          pressed.map((isPressed, index) => {
+            const is_blue_key = (index: number) => {
+              if (index === 1 || index === 3 || index === 5) {
+                return <div key={index} className={isPressed ? "key-pressed-blue" : "key"}></div>;
+              } else {
+                return;
+              }
+            }
+
+            return (is_blue_key(index))
+          })
+        }
+      </div>
+
+      <div className="row">
+        {
+          pressed.map((isPressed, index) => {
+            const is_blue_key = (index: number) => {
+              if (index === 0 || index === 2 || index === 4 || index === 6) {
+                return <div key={index} className={isPressed ? "key-pressed-white" : "key"}></div>;
+              } else {
+                return;
+              }
+            }
+
+            return (is_blue_key(index))
+          })
+        }
+      </div>
+    </div>
+
+  );
+}
+
 function App() {
   const [pressed, setPressed] = useState(Array(7).fill(false));
   const [rotation, setRotation] = useState(0.0);
   const [isTopRotating, setIsTopRotating] = useState(false);
   const [isBottomRotating, setIsBottomRotating] = useState(false);
   const [count, setCount] = useState(0);
+  const [isPlayerOneSide, setIsPlayerOneSide] = useState(true);
 
   const once = useRef(false);
 
@@ -100,44 +148,29 @@ function App() {
     <>
       <div className="container">
         <div className="main-layout">
+          {
+            isPlayerOneSide ? (
+              <>
+                <div className="scratch-container">
+                  <div className={`scratch scratch-top ${isTopRotating ? 'rotating' : ''}`}></div>
+                  <div className={`scratch scratch-bottom ${isBottomRotating ? 'rotating' : ''}`}></div>
+                </div>
+                <KeysComponent pressed={pressed} />
+              </>
+            ) : (
+              <>
+                <KeysComponent pressed={pressed} />
+                <div className="scratch-container player-two">
+                  <div className={`scratch scratch-top ${isTopRotating ? 'rotating' : ''}`}></div>
+                  <div className={`scratch scratch-bottom ${isBottomRotating ? 'rotating' : ''}`}></div>
+                </div>
+              </>
+            )
+          }
 
-          <div className="scratch-container">
-            <div className={`scratch scratch-top ${isTopRotating ? 'rotating' : ''}`}></div>
-            <div className={`scratch scratch-bottom ${isBottomRotating ? 'rotating' : ''}`}></div>
-          </div>
-
-          <div className="keys-container">
-            <div className="row">
-              {
-                pressed.map((isPressed, index) => {
-                  const is_blue_key = (index: number) => {
-                    if (index === 1 || index === 3 || index === 5) {
-                      return <div key={index} className={isPressed ? "key-pressed-blue" : "key"}></div>;
-                    } else {
-                      return;
-                    }
-                  }
-
-                  return (is_blue_key(index))
-                })
-              }
-            </div>
-
-            <div className="row">
-              {
-                pressed.map((isPressed, index) => {
-                  const is_blue_key = (index: number) => {
-                    if (index === 0 || index === 2 || index === 4 || index === 6) {
-                      return <div key={index} className={isPressed ? "key-pressed-white" : "key"}></div>;
-                    } else {
-                      return;
-                    }
-                  }
-
-                  return (is_blue_key(index))
-                })
-              }
-            </div>
+          <div className="change-button-container" onClick={() => { setIsPlayerOneSide(!isPlayerOneSide) }}>
+            <img src="public/change_icon.png" className="change-icon">
+            </img>
           </div>
         </div>
         <div className="information-container">
