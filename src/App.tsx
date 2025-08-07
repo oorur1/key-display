@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useState, useEffect, useRef } from "react";
+//import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 import { listen } from '@tauri-apps/api/event';
 
@@ -15,6 +15,9 @@ function App() {
   const [rotation, setRotation] = useState(0.0);
   const [isTopRotating, setIsTopRotating] = useState(false);
   const [isBottomRotating, setIsBottomRotating] = useState(false);
+  const [count, setCount] = useState(0);
+
+  const once = useRef(false);
 
   async function setupGamepadListener() {
     const unlisten = await listen<GamepadEvent>('gamepad-input', event => {
@@ -27,6 +30,8 @@ function App() {
             newPressed[buttonIndex] = true;
             return newPressed;
           });
+          setCount(prevCount => { return prevCount + 1 });
+          console.log("pressed");
         }
         else {
           setPressed(prevPressed => {
@@ -57,6 +62,9 @@ function App() {
 
   // Gamepad listenerの起動
   useEffect(() => {
+    if (once.current) return;
+    once.current = true;
+
     let unlistenFn: (() => void) | null = null;
 
     setupGamepadListener().then(unlisten => {
@@ -73,7 +81,6 @@ function App() {
 
   // Scratch
   useEffect(() => {
-    console.log(isBottomRotating);
     if (isTopRotating) {
       const timer = setTimeout(() => {
         setIsTopRotating(false);
@@ -132,6 +139,9 @@ function App() {
               }
             </div>
           </div>
+        </div>
+        <div className="information-container">
+          Key Count : {count}
         </div>
       </div >
     </>
