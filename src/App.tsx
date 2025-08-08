@@ -8,6 +8,7 @@ interface GamepadEvent {
   button?: number;
   pressed?: boolean;
   axis?: number;
+  averageReleaseTime?: number;
 }
 
 const ScratchComponent = () => {
@@ -59,6 +60,7 @@ const KeysComponent = ({ pressed }: { pressed: Array<boolean> }) => {
 
 function App() {
   const [pressed, setPressed] = useState(Array(7).fill(false));
+  const [averageReleaseTime, setAverageReleaseTime] = useState(0);
   const [rotation, setRotation] = useState(0.0);
   const [isTopRotating, setIsTopRotating] = useState(false);
   const [isBottomRotating, setIsBottomRotating] = useState(false);
@@ -69,9 +71,11 @@ function App() {
 
   async function setupGamepadListener() {
     const unlisten = await listen<GamepadEvent>('gamepad-input', event => {
+      // ボタンの処理
       if (event.payload.type == "button" && event.payload.button !== undefined) {
         const buttonIndex = event.payload.button;
         const isPressed = event.payload.pressed;
+        // 押したとき
         if (isPressed) {
           setPressed(prevPressed => {
             const newPressed = [...prevPressed];
@@ -79,16 +83,18 @@ function App() {
             return newPressed;
           });
           setCount(prevCount => { return prevCount + 1 });
-          console.log("pressed");
         }
-        else {
+        // リリース
+        else if (event.payload.averageReleaseTime !== undefined) {
           setPressed(prevPressed => {
             const newPressed = [...prevPressed];
             newPressed[buttonIndex] = false;
             return newPressed;
           });
+          setAverageReleaseTime(event.payload.averageReleaseTime);
         }
       }
+      // スクラッチの処理
       if (event.payload.type == "scratch" && event.payload.axis !== undefined) {
         const newRotation = (32768.0 + event.payload.axis) / 65536.0 * 360.0;
         setRotation(prevRotation => {
@@ -174,7 +180,12 @@ function App() {
           </div>
         </div>
         <div className="information-container">
-          Key Count : {count}
+          <p>
+            Key Count : {count}
+          </p>
+          <p>
+            Release Time : {averageReleaseTime}
+          </p>
         </div>
       </div >
     </>
