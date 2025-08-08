@@ -11,11 +11,19 @@ interface GamepadEvent {
   averageReleaseTime?: number;
 }
 
-const ScratchComponent = () => {
-  return (
-    <>
-    </>
-  );
+{
+  /*
+  const ScratchComponent = () => {
+    return (
+      <>
+        <div className="scratch-container">
+          <div className={`scratch scratch-top ${isTopRotating ? 'rotating' : ''}`}></div>
+          <div className={`scratch scratch-bottom ${isBottomRotating ? 'rotating' : ''}`}></div>
+        </div>
+      </>
+    );
+  }
+  */
 }
 
 const KeysComponent = ({ pressed }: { pressed: Array<boolean> }) => {
@@ -175,7 +183,7 @@ function App() {
           }
 
           <div className="change-button-container" onClick={() => { setIsPlayerOneSide(!isPlayerOneSide) }}>
-            <img src="public/change_icon.png" className="change-icon">
+            <img src="/change_icon.png" className="change-icon">
             </img>
           </div>
         </div>
