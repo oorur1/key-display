@@ -1,3 +1,3 @@
 pub mod manager;
 
-pub use manager::Gamepad;
+pub use manager::GamepadManager;

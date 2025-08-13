@@ -8,6 +8,7 @@ interface GamepadEvent {
   button?: number;
   pressed?: boolean;
   axis?: number;
+  direction?: string;
   averageReleaseTime?: number;
 }
 
@@ -103,20 +104,22 @@ function App() {
         }
       }
       // スクラッチの処理
-      if (event.payload.type == "scratch" && event.payload.axis !== undefined) {
-        const newRotation = (32768.0 + event.payload.axis) / 65536.0 * 360.0;
-        setRotation(prevRotation => {
-          //TODO: 0->360 もしくは 360 -> 0で逆方向の回転が入る
-          if (prevRotation > newRotation) {
-            setIsBottomRotating(true);
-            setIsTopRotating(false);
-          } else if (prevRotation < newRotation) {
-            setIsTopRotating(true);
-            setIsBottomRotating(false);
-          }
+      if (event.payload.type == "scratch" && event.payload.axis !== undefined && event.payload.direction !== undefined) {
 
-          return newRotation;
-        });
+        const newRotation = Math.ceil((32768.0 + event.payload.axis) / 65536.0 * 360.0);
+        setRotation(newRotation);
+
+        const direction = event.payload.direction;
+        if (direction == "left") {
+          setIsTopRotating(true);
+          setIsBottomRotating(false);
+        } else if (direction == "right") {
+          setIsTopRotating(false);
+          setIsBottomRotating(true);
+        } else if (direction == "neutral") {
+          setIsTopRotating(false);
+          setIsBottomRotating(false);
+        }
       }
     })
     return unlisten;
@@ -141,22 +144,6 @@ function App() {
     }
   }, []);
 
-  // Scratch
-  useEffect(() => {
-    if (isTopRotating) {
-      const timer = setTimeout(() => {
-        setIsTopRotating(false);
-      }, 50);
-
-      return () => clearTimeout(timer);
-    } else if (isBottomRotating) {
-      const timer = setTimeout(() => {
-        setIsBottomRotating(false);
-      }, 50);
-
-      return () => clearTimeout(timer);
-    }
-  }, [rotation]);
 
   return (
     <>
@@ -189,10 +176,10 @@ function App() {
         </div>
         <div className="information-container">
           <p>
-            Key Count : {count}
+            {count}
           </p>
           <p>
-            Release Time : {averageReleaseTime}
+            Release : {averageReleaseTime}
           </p>
         </div>
       </div >
