@@ -75,7 +75,6 @@ impl ScratchEvent {
             new_direction = Direction::Right;
         }
 
-        println!("axis:{}   new_axis:{}", self.axis, new_axis);
         self.axis = new_axis;
         self.spined_time = Some(Instant::now());
 
@@ -109,6 +108,7 @@ pub struct GamepadStatus {
     button_status: HashMap<u32, ButtonEvent>,
     recently_release_time: VecDeque<Duration>,
     scratch_event: ScratchEvent,
+    notes_count: u32,
 }
 
 impl GamepadStatus {
@@ -117,10 +117,12 @@ impl GamepadStatus {
             button_status: HashMap::new(),
             recently_release_time: VecDeque::new(),
             scratch_event: ScratchEvent::new(),
+            notes_count: 0,
         }
     }
 
     fn on_press(&mut self, button_code: u32) {
+        self.notes_count += 1;
         let button_event = self
             .button_status
             .entry(button_code)
@@ -138,6 +140,16 @@ impl GamepadStatus {
             }
         };
         return self.calc_release_time();
+    }
+    fn on_spin(&mut self, new_axis: i32) -> Option<Direction> {
+        let direction = self.scratch_event.on_spin(new_axis);
+        if let Some(direction) = direction.clone() {
+            match direction {
+                Direction::Neutral => (),
+                _ => self.notes_count += 1,
+            }
+        }
+        return direction;
     }
     // TODO: recently_release_timeの配列の配列が空であるときのエラー処理を書く
     fn calc_release_time(&self) -> Duration {
@@ -199,14 +211,15 @@ impl GamepadManager {
                                 // statusの更新
                                 if let Ok(mut status) = status.lock() {
                                     status.on_press(button_code);
-                                }
 
-                                let event = serde_json::json!({
-                                    "type": "button",
-                                    "button": button_code,
-                                    "pressed": true,
-                                });
-                                main_handle.emit("gamepad-input", &event).unwrap();
+                                    let event = serde_json::json!({
+                                        "type": "button",
+                                        "button": button_code,
+                                        "pressed": true,
+                                        "count": status.notes_count,
+                                    });
+                                    main_handle.emit("gamepad-input", &event).unwrap();
+                                }
                             }
                             EventType::ButtonReleased(button) => {
                                 let button_code = button.into_u32();
@@ -216,19 +229,20 @@ impl GamepadManager {
                                 if let Ok(mut status) = status.lock() {
                                     average_release_time =
                                         status.on_release(button_code).as_millis();
-                                }
 
-                                let event = serde_json::json!({
-                                    "type": "button",
-                                    "button": button_code,
-                                    "pressed": false,
-                                    "averageReleaseTime": average_release_time,
-                                });
-                                main_handle.emit("gamepad-input", &event).unwrap();
+                                    let event = serde_json::json!({
+                                        "type": "button",
+                                        "button": button_code,
+                                        "pressed": false,
+                                        "count" : status.notes_count,
+                                        "averageReleaseTime": average_release_time,
+                                    });
+                                    main_handle.emit("gamepad-input", &event).unwrap();
+                                }
                             }
                             EventType::AxisValueChanged(axis, _) => {
                                 if let Ok(mut status) = status.lock() {
-                                    if let Some(direction) = status.scratch_event.on_spin(axis) {
+                                    if let Some(direction) = status.on_spin(axis) {
                                         let event = serde_json::json!({
                                             "type": "scratch",
                                             "axis" : axis,
@@ -236,7 +250,8 @@ impl GamepadManager {
                                                 Direction::Left => "left",
                                                 Direction::Right => "right",
                                                 Direction::Neutral => "neutral",
-                                            }
+                                            },
+                                            "count" : status.notes_count,
                                         });
                                         main_handle.emit("gamepad-input", &event).unwrap();
                                     }
@@ -260,7 +275,8 @@ impl GamepadManager {
                         let event = serde_json::json!({
                             "type" :"scratch",
                             "axis" : status.scratch_event.axis,
-                            "direction" : "neutral"
+                            "direction" : "neutral",
+                            "count" :status.notes_count,
                         });
 
                         sub_handle.emit("gamepad-input", &event).unwrap();

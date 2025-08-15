@@ -7,8 +7,11 @@ interface GamepadEvent {
   type: string;
   button?: number;
   pressed?: boolean;
+
   axis?: number;
   direction?: string;
+
+  count: number;
   averageReleaseTime?: number;
 }
 
@@ -91,7 +94,7 @@ function App() {
             newPressed[buttonIndex] = true;
             return newPressed;
           });
-          setCount(prevCount => { return prevCount + 1 });
+          setCount(event.payload.count);
         }
         // リリース
         else if (event.payload.averageReleaseTime !== undefined) {
@@ -101,6 +104,7 @@ function App() {
             return newPressed;
           });
           setAverageReleaseTime(event.payload.averageReleaseTime);
+          setCount(event.payload.count);
         }
       }
       // スクラッチの処理
@@ -108,6 +112,7 @@ function App() {
 
         const newRotation = Math.ceil((32768.0 + event.payload.axis) / 65536.0 * 360.0);
         setRotation(newRotation);
+        setCount(event.payload.count);
 
         const direction = event.payload.direction;
         if (direction == "left") {
