@@ -18,8 +18,7 @@
   margin: 0;
   padding-top: 10vh;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  justify-content: space-evenly;
   text-align: center;
 }
 
@@ -28,7 +27,11 @@
   justify-content: center;
 }
 
-.main-layout {
+.main-content {
+  width: 70%;
+}
+
+.mania-layout {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -108,6 +111,33 @@
   justify-content: flex-start;
   margin-top: 5vh;
   font-size: 30px;
+  text-align: center;
+}
+
+.sidebar {
+  font-size: 20px;
+  justify-content: center;
+  width: 150px;
+}
+
+.sidebar-item {
+  display: flex;
+  height: 50px;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 4px solid transparent;
+}
+
+.sidebar-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-left-color: #009fef;
+}
+
+.sidebar-item.active {
+  background: rgba(0, 168, 255, 0.2);
+  border-left-color: #01a8ff;
 }
 
 .change-button-container {
