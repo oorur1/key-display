@@ -15,6 +15,8 @@ interface GamepadEvent {
   averageReleaseTime?: number;
 }
 
+type Tab = 'mania' | 'stats' | 'setting';
+
 {
   /*
   const ScratchComponent = () => {
@@ -71,6 +73,7 @@ const KeysComponent = ({ pressed }: { pressed: Array<boolean> }) => {
 }
 
 function App() {
+  // コントローラーに関するState
   const [pressed, setPressed] = useState(Array(7).fill(false));
   const [averageReleaseTime, setAverageReleaseTime] = useState(0);
   const [rotation, setRotation] = useState(0.0);
@@ -79,6 +82,11 @@ function App() {
   const [count, setCount] = useState(0);
   const [isPlayerOneSide, setIsPlayerOneSide] = useState(true);
 
+  // UIに関するState 
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<Tab>('mania');
+
+  // UseEfectを一度だけ実行する
   const once = useRef(false);
 
   async function setupGamepadListener() {
@@ -153,40 +161,73 @@ function App() {
   return (
     <>
       <div className="container">
-        <div className="main-layout">
+        <div className="main-content">
           {
-            isPlayerOneSide ? (
+            // mania用レイアウト
+            activeTab === 'mania' && (
               <>
-                <div className="scratch-container">
-                  <div className={`scratch scratch-top ${isTopRotating ? 'rotating' : ''}`}></div>
-                  <div className={`scratch scratch-bottom ${isBottomRotating ? 'rotating' : ''}`}></div>
+                <div className="mania-layout">
+                  {
+                    isPlayerOneSide ? (
+                      <>
+                        <div className="scratch-container">
+                          <div className={`scratch scratch-top ${isTopRotating ? 'rotating' : ''}`}></div>
+                          <div className={`scratch scratch-bottom ${isBottomRotating ? 'rotating' : ''}`}></div>
+                        </div>
+                        <KeysComponent pressed={pressed} />
+                      </>
+                    ) : (
+                      <>
+                        <KeysComponent pressed={pressed} />
+                        <div className="scratch-container player-two">
+                          <div className={`scratch scratch-top ${isTopRotating ? 'rotating' : ''}`}></div>
+                          <div className={`scratch scratch-bottom ${isBottomRotating ? 'rotating' : ''}`}></div>
+                        </div>
+                      </>
+                    )
+                  }
+
+                  <div className="change-button-container" onClick={() => { setIsPlayerOneSide(!isPlayerOneSide) }}>
+                    <img src="/change_icon.png" className="change-icon">
+                    </img>
+                  </div>
                 </div>
-                <KeysComponent pressed={pressed} />
-              </>
-            ) : (
-              <>
-                <KeysComponent pressed={pressed} />
-                <div className="scratch-container player-two">
-                  <div className={`scratch scratch-top ${isTopRotating ? 'rotating' : ''}`}></div>
-                  <div className={`scratch scratch-bottom ${isBottomRotating ? 'rotating' : ''}`}></div>
+
+                <div className="information-container">
+                  <p>
+                    {count}
+                  </p>
+                  <p>
+                    Release : {averageReleaseTime}
+                  </p>
                 </div>
               </>
             )
           }
+          {
+            activeTab === 'stats' && (
+              <>
+              </>
+            )
+          }
+          {
+            activeTab === 'setting' && (
+              <></>
+            )
+          }
 
-          <div className="change-button-container" onClick={() => { setIsPlayerOneSide(!isPlayerOneSide) }}>
-            <img src="/change_icon.png" className="change-icon">
-            </img>
-          </div>
+
         </div>
-        <div className="information-container">
-          <p>
-            {count}
-          </p>
-          <p>
-            Release : {averageReleaseTime}
-          </p>
-        </div>
+        {
+          sidebarOpen && (
+            <div className="sidebar">
+              <div className={`sidebar-item ${activeTab === "mania" ? "active" : ""}`} onClick={() => setActiveTab('mania')}>メイン</div>
+              <div className={`sidebar-item ${activeTab === "stats" ? "active" : ""}`} onClick={() => setActiveTab('stats')}>統計</div>
+              <div className={`sidebar-item ${activeTab === "setting" ? "active" : ""}`} onClick={() => setActiveTab('setting')}>設定</div>
+            </div >
+          )
+        }
+
       </div >
     </>
   );
