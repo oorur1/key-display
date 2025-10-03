@@ -1,0 +1,51 @@
+.heatmap-container {
+  display: inline-flex;
+  align-items: center;
+  border: solid 1px;
+  border-radius: 5px;
+  padding: 30px;
+  overflow: auto;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.contribution-grid {
+  display: flex;
+  gap: 1px;
+}
+
+.contribution-week {
+  gap: 1px;
+}
+
+.contribution-day {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin: 1px
+}
+
+.level-0 {
+  background-color: #1a1a1a;
+}
+
+.level-1 {
+  background-color: #0d4f73;
+
+}
+
+.level-2 {
+  background-color: #1a6b99;
+}
+
+.level-3 {
+  background-color: #2687bf;
+}
+
+.level-4 {
+  background-color: #33a3e6;
+}
+
+.level-5 {
+  background-color: #00a8ff;
+}
