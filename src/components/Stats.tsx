@@ -2,6 +2,11 @@ import dayjs from 'dayjs';
 
 import './Stats.css';
 
+type statsData = {
+  date: string,
+  count: number,
+}
+
 export default function Stats() {
   const sampleData = [
     { date: '2025-01-01', count: 1 },
@@ -13,8 +18,7 @@ export default function Stats() {
   ];
 
 
-  //const today = dayjs();
-  const today = dayjs('2025-12-31');
+  const today = dayjs();
   const startDate = dayjs('2025-01-01');
 
   const generateHeatmapData = () => {
