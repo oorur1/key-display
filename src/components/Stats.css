@@ -6,7 +6,7 @@
   padding: 30px;
   overflow: auto;
   width: fit-content;
-  max-width: 100%;
+  max-width: 90%;
 }
 
 .contribution-grid {
