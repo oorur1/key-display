@@ -1,288 +1,183 @@
 use gilrs_core::{Event, EventType, Gilrs};
-use std::collections::{HashMap, VecDeque};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
-const AXIS_MIN_VALUE: i32 = -32768;
-const AXIS_MAX_VALUE: i32 = 32767;
-
-// TODO:リリースタイムは直近300ノーツを対象に計算するようにする
-struct ButtonEvent {
-    pressed_count: u32,
-    pressed_time: Option<SystemTime>,
-}
-
-impl ButtonEvent {
-    fn new() -> ButtonEvent {
-        ButtonEvent {
-            pressed_count: 0,
-            pressed_time: None,
-        }
-    }
-
-    fn on_press(&mut self) {
-        self.pressed_count += 1;
-        self.pressed_time = Some(SystemTime::now());
-    }
-
-    fn on_release(&mut self) -> Option<Duration> {
-        if let Some(press_time) = self.pressed_time.take() {
-            if let Ok(duration) = press_time.elapsed() {
-                if duration < Duration::from_millis(200) {
-                    return Some(duration);
-                } else {
-                    return None;
-                }
-            }
-        }
-        None
-    }
-}
-
-#[derive(PartialEq, Clone)]
-enum Direction {
-    Neutral,
-    Left,
-    Right,
-}
-struct ScratchEvent {
-    spined_time: Option<Instant>,
-    direction: Direction,
-    axis: i32,
-}
-
-impl ScratchEvent {
-    // TODO:初期値をGilrsのGamepadから取得する
-    fn new() -> ScratchEvent {
-        ScratchEvent {
-            spined_time: None,
-            direction: Direction::Neutral,
-            axis: 0,
-        }
-    }
-
-    fn on_spin(&mut self, new_axis: i32) -> Option<Direction> {
-        let mut new_direction = Direction::Neutral;
-        if new_axis == AXIS_MIN_VALUE && self.axis == AXIS_MAX_VALUE {
-            new_direction = Direction::Left;
-        } else if new_axis == AXIS_MAX_VALUE && self.axis == AXIS_MIN_VALUE {
-            new_direction = Direction::Right;
-        } else if new_axis > self.axis {
-            new_direction = Direction::Left;
-        } else if new_axis < self.axis {
-            new_direction = Direction::Right;
-        }
-
-        self.axis = new_axis;
-        self.spined_time = Some(Instant::now());
-
-        if self.direction == new_direction {
-            return None;
-        } else {
-            self.direction = new_direction.clone();
-            return Some(new_direction);
-        }
-    }
-
-    fn reset_to_neutral(&mut self) -> bool {
-        if self.direction != Direction::Neutral {
-            self.direction = Direction::Neutral;
-            self.spined_time = None;
-            return true;
-        }
-        false
-    }
-    fn is_timeout(&self) -> bool {
-        if let Some(spined_time) = self.spined_time {
-            if self.direction != Direction::Neutral {
-                return spined_time.elapsed() >= Duration::from_millis(100);
-            }
-        }
-        false
-    }
-}
-
-pub struct GamepadStatus {
-    button_status: HashMap<u32, ButtonEvent>,
-    recently_release_time: VecDeque<Duration>,
-    scratch_event: ScratchEvent,
-    notes_count: u32,
-}
-
-impl GamepadStatus {
-    fn new() -> GamepadStatus {
-        GamepadStatus {
-            button_status: HashMap::new(),
-            recently_release_time: VecDeque::new(),
-            scratch_event: ScratchEvent::new(),
-            notes_count: 0,
-        }
-    }
-
-    fn on_press(&mut self, button_code: u32) {
-        self.notes_count += 1;
-        let button_event = self
-            .button_status
-            .entry(button_code)
-            .or_insert_with(ButtonEvent::new);
-        button_event.on_press();
-    }
-    fn on_release(&mut self, button_code: u32) -> Duration {
-        if let Some(button_event) = self.button_status.get_mut(&button_code) {
-            let duration = button_event.on_release();
-            if let Some(release_time) = duration {
-                self.recently_release_time.push_back(release_time);
-                if self.recently_release_time.len() > 2000 {
-                    self.recently_release_time.pop_front();
-                }
-            }
-        };
-        return self.calc_release_time();
-    }
-    fn on_spin(&mut self, new_axis: i32) -> Option<Direction> {
-        let direction = self.scratch_event.on_spin(new_axis);
-        if let Some(direction) = direction.clone() {
-            match direction {
-                Direction::Neutral => (),
-                _ => self.notes_count += 1,
-            }
-        }
-        return direction;
-    }
-    // TODO: recently_release_timeの配列の配列が空であるときのエラー処理を書く
-    fn calc_release_time(&self) -> Duration {
-        let mut release_time = Duration::from_millis(0);
-        let num = self.recently_release_time.len();
-        let sum = self
-            .recently_release_time
-            .iter()
-            .fold(Duration::from_millis(0), |sum, x| sum + *x);
-        if num > 0 {
-            release_time = sum / num as u32;
-        }
-
-        return release_time;
-    }
-}
+use super::error::GamepadError;
+use super::scratch::Direction;
+use super::status::GamepadStatus;
 
 pub struct GamepadManager {
-    pub gilrs: Arc<Mutex<Gilrs>>,
-    pub active_gamepad: Arc<Mutex<Option<usize>>>,
-    pub status: Arc<Mutex<GamepadStatus>>,
+    gilrs: Arc<Mutex<Gilrs>>,
+    active_gamepad: Arc<Mutex<Option<usize>>>,
+    status: Arc<Mutex<GamepadStatus>>,
+    is_running: Arc<AtomicBool>,
 }
 
 impl GamepadManager {
-    pub fn new() -> GamepadManager {
-        let gilrs = Gilrs::new().unwrap();
+    pub fn new() -> Result<GamepadManager, GamepadError> {
+        let gilrs = Gilrs::new()
+            .map_err(|e| GamepadError::GilrsError((format!("Faild to initialize Gilrs: {}", e))))?;
 
-        let active_gamepad = None;
-        GamepadManager {
+        Ok(GamepadManager {
             gilrs: Arc::new(Mutex::new(gilrs)),
-            active_gamepad: Arc::new(Mutex::new(active_gamepad)),
+            active_gamepad: Arc::new(Mutex::new(None)),
             status: Arc::new(Mutex::new(GamepadStatus::new())),
-        }
+            is_running: Arc::new(AtomicBool::new(true)),
+        })
     }
 
-    pub fn start_event_loop(&self, app_handle: AppHandle) {
+    pub fn start_event_loop(&self, app_handle: AppHandle) -> Result<(), GamepadError> {
         let gilrs = Arc::clone(&self.gilrs);
         let active_gamepad = Arc::clone(&self.active_gamepad);
         let status = Arc::clone(&self.status);
+        let is_running = Arc::clone(&self.is_running);
 
         let main_handle = app_handle.clone();
         let sub_handle = app_handle.clone();
 
         thread::spawn(move || {
-            loop {
-                // Examine new events
-                if let Ok(mut gilrs) = gilrs.lock() {
-                    while let Some(Event {
-                        id, event, time, ..
-                    }) = gilrs.next_event()
-                    {
-                        if let Ok(mut active_gamepad) = active_gamepad.lock() {
-                            *active_gamepad = Some(id);
-                        }
-                        match event {
-                            EventType::ButtonPressed(button) => {
-                                let button_code = button.into_u32();
-
-                                // statusの更新
-                                if let Ok(mut status) = status.lock() {
-                                    status.on_press(button_code);
-
-                                    let event = serde_json::json!({
-                                        "type": "button",
-                                        "button": button_code,
-                                        "pressed": true,
-                                        "count": status.notes_count,
-                                    });
-                                    main_handle.emit("gamepad-input", &event).unwrap();
-                                }
-                            }
-                            EventType::ButtonReleased(button) => {
-                                let button_code = button.into_u32();
-                                let mut average_release_time = 0;
-
-                                // statusの更新
-                                if let Ok(mut status) = status.lock() {
-                                    average_release_time =
-                                        status.on_release(button_code).as_millis();
-
-                                    let event = serde_json::json!({
-                                        "type": "button",
-                                        "button": button_code,
-                                        "pressed": false,
-                                        "count" : status.notes_count,
-                                        "averageReleaseTime": average_release_time,
-                                    });
-                                    main_handle.emit("gamepad-input", &event).unwrap();
-                                }
-                            }
-                            EventType::AxisValueChanged(axis, _) => {
-                                if let Ok(mut status) = status.lock() {
-                                    if let Some(direction) = status.on_spin(axis) {
-                                        let event = serde_json::json!({
-                                            "type": "scratch",
-                                            "axis" : axis,
-                                            "direction": match direction{
-                                                Direction::Left => "left",
-                                                Direction::Right => "right",
-                                                Direction::Neutral => "neutral",
-                                            },
-                                            "count" : status.notes_count,
-                                        });
-                                        main_handle.emit("gamepad-input", &event).unwrap();
-                                    }
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                thread::sleep(std::time::Duration::from_millis(8))
+            if let Err(e) =
+                Self::run_main_loop(gilrs, active_gamepad, status, main_handle, is_running)
+            {
+                eprintln!("Main loop error: {}", e);
             }
         });
 
         // スクラッチタイムアウト用のスレッド
         let status = Arc::clone(&self.status);
-        thread::spawn(move || loop {
-            thread::sleep(Duration::from_millis(10));
-            if let Ok(mut status) = status.lock() {
-                if status.scratch_event.is_timeout() {
-                    if status.scratch_event.reset_to_neutral() {
-                        let event = serde_json::json!({
-                            "type" :"scratch",
-                            "axis" : status.scratch_event.axis,
-                            "direction" : "neutral",
-                            "count" :status.notes_count,
-                        });
-
-                        sub_handle.emit("gamepad-input", &event).unwrap();
-                    }
-                }
+        let is_running = Arc::clone(&self.is_running);
+        thread::spawn(move || {
+            if let Err(e) = Self::run_scratch_timeout_loop(status, sub_handle, is_running) {
+                eprintln!("Scratch timeout loop error: {}", e);
             }
         });
+        Ok(())
+    }
+
+    fn run_main_loop(
+        gilrs: Arc<Mutex<Gilrs>>,
+        active_gamepad: Arc<Mutex<Option<usize>>>,
+        status: Arc<Mutex<GamepadStatus>>,
+        app_handle: AppHandle,
+        is_running: Arc<AtomicBool>,
+    ) -> Result<(), GamepadError> {
+        while is_running.load(Ordering::Relaxed) {
+            let mut gilrs = gilrs
+                .lock()
+                .map_err(|e| GamepadError::LockError(format!("Failed to lock gilrs: {}", e)))?;
+
+            while let Some(Event { id, event, .. }) = gilrs.next_event() {
+                if !is_running.load(Ordering::Relaxed) {
+                    break;
+                }
+
+                // アクティブゲームパッドを更新
+                if let Ok(mut active) = active_gamepad.lock() {
+                    *active = Some(id);
+                }
+
+                if let Err(e) = Self::handle_gamepad_event(event, &status, &app_handle) {
+                    eprintln!("Event handling error: {}", e);
+                }
+            }
+
+            thread::sleep(Duration::from_millis(8));
+        }
+        Ok(())
+    }
+
+    fn handle_gamepad_event(
+        event: EventType,
+        status: &Arc<Mutex<GamepadStatus>>,
+        app_handle: &AppHandle,
+    ) -> Result<(), GamepadError> {
+        let mut status = status
+            .lock()
+            .map_err(|e| GamepadError::LockError(format!("Failed to lock status: {}", e)))?;
+
+        match event {
+            EventType::ButtonPressed(button) => {
+                let button_code = button.into_u32();
+                let count = status.on_button_press(button_code)?;
+
+                let event = serde_json::json!({
+                    "type": "button",
+                    "button": button_code,
+                    "pressed": true,
+                    "count": count,
+                });
+
+                app_handle.emit("gamepad-input", &event).map_err(|e| {
+                    GamepadError::EmitError(format!("Failed to emit button press: {}", e))
+                })?;
+            }
+            EventType::ButtonReleased(button) => {
+                let button_code = button.into_u32();
+                let (count, avg_release_time) = status.on_button_release(button_code)?;
+
+                let event = serde_json::json!({
+                    "type": "button",
+                    "button": button_code,
+                    "pressed": false,
+                    "count": count,
+                    "averageReleaseTime": avg_release_time.as_millis(),
+                });
+
+                app_handle.emit("gamepad-input", &event).map_err(|e| {
+                    GamepadError::EmitError(format!("Failed to emit button release: {}", e))
+                })?;
+            }
+            EventType::AxisValueChanged(axis, _) => {
+                let (direction, count) = status.on_scratch_spin(axis)?;
+
+                if let Some(direction) = direction {
+                    let event = serde_json::json!({
+                        "type": "scratch",
+                        "axis": axis,
+                        "direction": direction.as_str(),
+                        "count": count,
+                    });
+
+                    app_handle.emit("gamepad-input", &event).map_err(|e| {
+                        GamepadError::EmitError(format!("Failed to emit scratch: {}", e))
+                    })?;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn run_scratch_timeout_loop(
+        status: Arc<Mutex<GamepadStatus>>,
+        app_handle: AppHandle,
+        is_running: Arc<AtomicBool>,
+    ) -> Result<(), GamepadError> {
+        while is_running.load(Ordering::Relaxed) {
+            thread::sleep(Duration::from_millis(10));
+
+            let mut status = status.lock().map_err(|e| {
+                GamepadError::LockError(format!("Failed to lock status in timeout: {}", e))
+            })?;
+
+            if status.scratch_event().is_timeout() {
+                if status.scratch_event_mut().reset_to_neutral() {
+                    let event = serde_json::json!({
+                        "type": "scratch",
+                        "axis": status.scratch_event().axis(),
+                        "direction": "neutral",
+                        "count": status.notes_count(),
+                    });
+
+                    app_handle.emit("gamepad-input", &event).map_err(|e| {
+                        GamepadError::EmitError(format!("Failed to emit timeout: {}", e))
+                    })?;
+                }
+            }
+        }
+        Ok(())
     }
 }
