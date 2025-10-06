@@ -19,7 +19,7 @@ pub struct GamepadManager {
 impl GamepadManager {
     pub fn new() -> Result<GamepadManager, GamepadError> {
         let gilrs = Gilrs::new()
-            .map_err(|e| GamepadError::GilrsError((format!("Faild to initialize Gilrs: {}", e))))?;
+            .map_err(|e| GamepadError::GilrsError(format!("Failed to initialize Gilrs: {}", e)))?;
 
         Ok(GamepadManager {
             gilrs: Arc::new(Mutex::new(gilrs)),
@@ -179,5 +179,9 @@ impl GamepadManager {
             }
         }
         Ok(())
+    }
+
+    pub fn shutdown(&self) {
+        self.is_running.store(false, Ordering::Relaxed);
     }
 }
