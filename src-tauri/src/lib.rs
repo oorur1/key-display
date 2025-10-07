@@ -1,6 +1,8 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod gamepad;
+mod database;
 use gamepad::GamepadManager;
+use database::DatabaseManager;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
