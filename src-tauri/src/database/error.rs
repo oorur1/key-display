@@ -4,6 +4,7 @@ use std::fmt;
 pub enum DatabaseError {
     ConnectionError(String),
     InitializeError(String),
+    QueryError(String),
 }
 
 impl std::error::Error for DatabaseError {}
@@ -13,6 +14,7 @@ impl fmt::Display for DatabaseError {
         match self {
             DatabaseError::ConnectionError(msg) => write!(f, "Connection error: {}", msg),
             DatabaseError::InitializeError(msg) => write!(f, "Initialize error: {}", msg),
+            DatabaseError::QueryError(msg) => write!(f, "Query error: {}", msg),
         }
     }
 }
