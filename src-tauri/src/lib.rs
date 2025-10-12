@@ -1,10 +1,10 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-mod gamepad;
 mod database;
-use gamepad::GamepadManager;
+mod gamepad;
 use database::DatabaseManager;
-use tauri::Manager;
+use gamepad::GamepadManager;
 use std::sync::{Arc, Mutex};
+use tauri::Manager;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -15,9 +15,22 @@ fn greet(name: &str) -> String {
 fn get_statistics(
     date: String,
     db: tauri::State<Arc<Mutex<DatabaseManager>>>,
-) -> Result<Option<i32>, String>{
-    let db = db.lock().map_err(|e| format!("Failed to lock database: {}", e))?;
+) -> Result<Option<i32>, String> {
+    let db = db
+        .lock()
+        .map_err(|e| format!("Failed to lock database: {}", e))?;
     db.get(&date).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_year_statistics(
+    year: i32,
+    db: tauri::State<Arc<Mutex<DatabaseManager>>>,
+) -> Result<Vec<(String, i32)>, String> {
+    let db = db
+        .lock()
+        .map_err(|e| format!("Failed to lock database: {}", e))?;
+    db.get_year_statistics(year).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -26,8 +39,10 @@ fn update_statistics(
     notes_count: i32,
     db: tauri::State<Arc<Mutex<DatabaseManager>>>,
 ) -> Result<(), String> {
-    let db = db.lock().map_err(|e| format!("Failed to lock database: {}", e))?;
-    
+    let db = db
+        .lock()
+        .map_err(|e| format!("Failed to lock database: {}", e))?;
+
     // 既存のデータがあれば更新、なければ挿入
     match db.get(&date) {
         Ok(Some(_)) => db.update(&date, notes_count).map_err(|e| e.to_string()),
@@ -36,7 +51,6 @@ fn update_statistics(
     }
 }
 
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -44,6 +58,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             get_statistics,
+            get_year_statistics,
             update_statistics
         ])
         .setup(move |app| {
@@ -53,11 +68,12 @@ pub fn run() {
 
             // データベースの初期化
             let mut database_manager = DatabaseManager::new(db_path)
-            .map_err(|e| format!("Failed to create DatabaseManager: {}", e))?;
+                .map_err(|e| format!("Failed to create DatabaseManager: {}", e))?;
 
-            database_manager.initialize()
-            .map_err(|e| format!("Failed to initialize database: {}", e))?;
-            
+            database_manager
+                .initialize()
+                .map_err(|e| format!("Failed to initialize database: {}", e))?;
+
             app.manage(Arc::new(Mutex::new(database_manager)));
 
             let gamepad_manager = GamepadManager::new()
