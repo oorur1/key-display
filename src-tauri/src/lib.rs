@@ -4,7 +4,7 @@ mod gamepad;
 use database::DatabaseManager;
 use gamepad::GamepadManager;
 use std::sync::{Arc, Mutex};
-use tauri::Manager;
+use tauri::{Manager, RunEvent};
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -51,6 +51,23 @@ fn update_statistics(
     }
 }
 
+#[tauri::command]
+fn save_current_count(
+    db: tauri::State<Arc<Mutex<DatabaseManager>>>,
+    gamepad: tauri::State<Arc<Mutex<GamepadManager>>>,
+) -> Result<(), String> {
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let count = {
+        let gamepad = gamepad
+            .lock()
+            .map_err(|e| format!("Failed to lock gamepad:{}", e))?;
+        gamepad
+            .notes_count()
+            .map_err(|e| format!("Failed to get notes_count: {}", e))?
+    };
+    update_statistics(today, count as i32, db)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -59,7 +76,8 @@ pub fn run() {
             greet,
             get_statistics,
             get_year_statistics,
-            update_statistics
+            update_statistics,
+            save_current_count,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
@@ -82,8 +100,24 @@ pub fn run() {
             gamepad_manager
                 .start_event_loop(app_handle)
                 .map_err(|e| format!("Failed to start event loop: {}", e))?;
+
+            app.manage(Arc::new(Mutex::new(gamepad_manager)));
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app_handle, event| {
+            if let RunEvent::Exit = event {
+                println!("Application is exiting, saving statistics...");
+
+                // GamepadManagerとDatabaseManagerを取得
+                if let (Some(gamepad_mgr), Some(db_mgr)) = (
+                    app_handle.try_state::<Arc<Mutex<GamepadManager>>>(),
+                    app_handle.try_state::<Arc<Mutex<DatabaseManager>>>(),
+                ) {
+                    save_current_count(db_mgr, gamepad_mgr)
+                        .unwrap_or_else(|e| eprintln!("Failed to save: {}", e));
+                }
+            }
+        });
 }
