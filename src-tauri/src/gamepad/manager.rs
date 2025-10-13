@@ -181,6 +181,14 @@ impl GamepadManager {
         Ok(())
     }
 
+    pub fn notes_count(&self) -> Result<u32, GamepadError> {
+        let status = self
+            .status
+            .lock()
+            .map_err(|e| GamepadError::LockError(format!("Failed to lock status: {}", e)))?;
+        Ok(status.notes_count())
+    }
+
     pub fn shutdown(&self) {
         self.is_running.store(false, Ordering::Relaxed);
     }
