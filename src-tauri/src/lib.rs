@@ -115,8 +115,10 @@ pub fn run() {
                     app_handle.try_state::<Arc<Mutex<GamepadManager>>>(),
                     app_handle.try_state::<Arc<Mutex<DatabaseManager>>>(),
                 ) {
-                    save_current_count(db_mgr, gamepad_mgr)
-                        .unwrap_or_else(|e| eprintln!("Failed to save: {}", e));
+                    match save_current_count(db_mgr, gamepad_mgr) {
+                        Ok(_) => println!("Statistics saved successfully"),
+                        Err(e) => eprintln!("Failed to save statistics: {}", e),
+                    }
                 }
             }
         });
