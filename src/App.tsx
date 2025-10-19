@@ -84,7 +84,9 @@ function App() {
   const [isPlayerOneSide, setIsPlayerOneSide] = useState(true);
 
   // UIに関するState 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // build用
+  //const [sidebarOpen, setSidebarOpen] = useState(true);
+  const sidebarOpen = true;
   const [activeTab, setActiveTab] = useState<Tab>('mania');
 
   // UseEfectを一度だけ実行する
