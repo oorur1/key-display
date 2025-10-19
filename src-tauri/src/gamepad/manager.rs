@@ -1,4 +1,5 @@
 use gilrs_core::{Event, EventType, Gilrs};
+use std::fmt::format;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -187,6 +188,24 @@ impl GamepadManager {
             .lock()
             .map_err(|e| GamepadError::LockError(format!("Failed to lock status: {}", e)))?;
         Ok(status.notes_count())
+    }
+
+    pub fn difference_notes_count(&self) -> Result<u32, GamepadError> {
+        let status = self
+            .status
+            .lock()
+            .map_err(|e| GamepadError::LockError(format!("Failed to lock status: {}", e)))?;
+
+        Ok(status.difference_notes_count())
+    }
+
+    pub fn update_last_saved_count(&mut self) -> Result<(), GamepadError> {
+        let mut status = self
+            .status
+            .lock()
+            .map_err(|e| GamepadError::LockError(format!("Failed to lock status: {}", e)))?;
+        status.set_last_saved_count();
+        Ok(())
     }
 
     pub fn shutdown(&self) {

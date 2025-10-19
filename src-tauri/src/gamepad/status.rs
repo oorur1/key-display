@@ -64,6 +64,14 @@ impl GamepadStatus {
         self.statistics.notes_count()
     }
 
+    pub fn difference_notes_count(&self) -> u32 {
+        self.statistics.difference_notes_count()
+    }
+
+    pub fn set_last_saved_count(&mut self) {
+        self.statistics.set_last_saved_count();
+    }
+
     pub fn average_release_time(&self) -> Duration {
         self.statistics.average_release_time()
     }

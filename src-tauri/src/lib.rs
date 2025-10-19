@@ -3,7 +3,10 @@ mod database;
 mod gamepad;
 use database::DatabaseManager;
 use gamepad::GamepadManager;
-use std::sync::{Arc, Mutex};
+use std::{
+    fmt::format,
+    sync::{Arc, Mutex},
+};
 use tauri::{Manager, RunEvent};
 
 #[tauri::command]
@@ -57,15 +60,39 @@ fn save_current_count(
     gamepad: tauri::State<Arc<Mutex<GamepadManager>>>,
 ) -> Result<(), String> {
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-    let count = {
+    let delta_count = {
         let gamepad = gamepad
             .lock()
             .map_err(|e| format!("Failed to lock gamepad:{}", e))?;
         gamepad
-            .notes_count()
+            .difference_notes_count()
             .map_err(|e| format!("Failed to get notes_count: {}", e))?
     };
-    update_statistics(today, count as i32, db)
+
+    // データベースから現在の値を取得して加算
+    let new_count = {
+        let db_guard = db
+            .lock()
+            .map_err(|e| format!("Failed to lock database: {}", e))?;
+        let current_count = db_guard
+            .get(&today)
+            .map_err(|e| e.to_string())?
+            .unwrap_or(0);
+        current_count + delta_count as i32
+    };
+
+    match update_statistics(today, new_count as i32, db) {
+        Ok(()) => {
+            let mut gamepad = gamepad
+                .lock()
+                .map_err(|e| format!("Failed to lock gamepad: {}", e))?;
+            gamepad
+                .update_last_saved_count()
+                .map_err(|e| format!("Failed to update save count: {}", e))?;
+        }
+        Err(error) => Err(error)?,
+    }
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
