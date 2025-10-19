@@ -79,7 +79,6 @@ function App() {
   // コントローラーに関するState
   const [pressed, setPressed] = useState(Array(7).fill(false));
   const [averageReleaseTime, setAverageReleaseTime] = useState(0);
-  const [rotation, setRotation] = useState(0.0);
   const [isTopRotating, setIsTopRotating] = useState(false);
   const [isBottomRotating, setIsBottomRotating] = useState(false);
   const [count, setCount] = useState(0);
@@ -131,8 +130,6 @@ function App() {
       // スクラッチの処理
       if (event.payload.type == "scratch" && event.payload.axis !== undefined && event.payload.direction !== undefined) {
 
-        const newRotation = Math.ceil((32768.0 + event.payload.axis) / 65536.0 * 360.0);
-        setRotation(newRotation);
         setCount(event.payload.count);
 
         const direction = event.payload.direction;
