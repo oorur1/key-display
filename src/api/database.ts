@@ -32,3 +32,12 @@ export async function updateStatistics(date: string, notesCount: number): Promis
     throw error;
   }
 }
+
+export async function saveCurrentCount(): Promise<void> {
+  try {
+    await invoke('save_current_count');
+  } catch (error) {
+    console.error('Failed to update statistics');
+    throw error;
+  }
+}
