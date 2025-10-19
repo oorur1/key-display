@@ -32,6 +32,7 @@ impl ReleaseTimeTracker {
 #[derive(Debug)]
 pub struct GameStatistics {
     notes_count: u32,
+    last_save_count: u32,
     release_tracker: ReleaseTimeTracker,
 }
 
@@ -39,6 +40,7 @@ impl GameStatistics {
     pub fn new() -> GameStatistics {
         GameStatistics {
             notes_count: 0,
+            last_save_count: 0,
             release_tracker: ReleaseTimeTracker::new(2000),
         }
     }
@@ -49,6 +51,14 @@ impl GameStatistics {
 
     pub fn notes_count(&self) -> u32 {
         self.notes_count
+    }
+
+    pub fn set_last_saved_count(&mut self) {
+        self.last_save_count = self.notes_count;
+    }
+
+    pub fn difference_notes_count(&self) -> u32 {
+        self.notes_count - self.last_save_count
     }
 
     pub fn add_release_time(&mut self, duration: Duration) {
