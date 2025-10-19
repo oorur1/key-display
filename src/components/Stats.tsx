@@ -67,7 +67,7 @@ export default function Stats() {
       const nextWeek = currentDate.add(7, 'day');
       // 年始のDecemberだけ表示しない
       if ((nextWeek.month() !== currentDate.month() || nextWeek.isAfter(endDate))
-        && !(nextWeek.month() == 0 && currentDate.month() == 11)) {
+        && !(nextWeek.year() === currentYear && nextWeek.month() == 0 && currentDate.month() == 11)) {
         months.push({
           monthName: currentDate.format('MMM'),
           weeks: currentMonthWeeks,
