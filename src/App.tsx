@@ -91,16 +91,6 @@ function App() {
   // UseEfectを一度だけ実行する
   const once = useRef(false);
 
-  const saveStatistics = async () => {
-    const today = new Date().toISOString().split('T')[0];
-    try {
-      await updateStatistics(today, count);
-      console.log('Statistics saved:');
-    } catch (error) {
-      console.error('Failed to save statistics:', error);
-    }
-  }
-
   async function setupGamepadListener() {
     const unlisten = await listen<GamepadEvent>('gamepad-input', event => {
       // ボタンの処理
