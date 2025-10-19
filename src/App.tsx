@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 //import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 import { listen } from '@tauri-apps/api/event';
-import { updateStatistics } from "./api/database";
 
 import Stats from "./components/Stats";
 
@@ -79,28 +78,19 @@ function App() {
   // コントローラーに関するState
   const [pressed, setPressed] = useState(Array(7).fill(false));
   const [averageReleaseTime, setAverageReleaseTime] = useState(0);
-  const [rotation, setRotation] = useState(0.0);
   const [isTopRotating, setIsTopRotating] = useState(false);
   const [isBottomRotating, setIsBottomRotating] = useState(false);
   const [count, setCount] = useState(0);
   const [isPlayerOneSide, setIsPlayerOneSide] = useState(true);
 
   // UIに関するState 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // build用
+  //const [sidebarOpen, setSidebarOpen] = useState(true);
+  const sidebarOpen = true;
   const [activeTab, setActiveTab] = useState<Tab>('mania');
 
   // UseEfectを一度だけ実行する
   const once = useRef(false);
-
-  const saveStatistics = async () => {
-    const today = new Date().toISOString().split('T')[0];
-    try {
-      await updateStatistics(today, count);
-      console.log('Statistics saved:');
-    } catch (error) {
-      console.error('Failed to save statistics:', error);
-    }
-  }
 
   async function setupGamepadListener() {
     const unlisten = await listen<GamepadEvent>('gamepad-input', event => {
@@ -131,8 +121,6 @@ function App() {
       // スクラッチの処理
       if (event.payload.type == "scratch" && event.payload.axis !== undefined && event.payload.direction !== undefined) {
 
-        const newRotation = Math.ceil((32768.0 + event.payload.axis) / 65536.0 * 360.0);
-        setRotation(newRotation);
         setCount(event.payload.count);
 
         const direction = event.payload.direction;
